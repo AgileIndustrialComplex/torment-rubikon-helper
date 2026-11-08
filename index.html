@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Labyrinth</title>
+<style>
+  :root{
+    --ink:#e3d5b4; --bone:#f0e4c4; --gold:#c8a35a; --gold-dim:#8d7440;
+    --blood:#8f2a1e; --muted:#93805f; --line:#3b2c1b;
+    --stone:#14100a; --stone2:#1c1710; --stone3:#241d14;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1100px 620px at 50% -12%, #2a1e12 0%, rgba(10,8,6,0) 62%),
+      radial-gradient(900px 700px at 50% 120%, #1a1209 0%, rgba(8,6,5,0) 60%),
+      #070605;
+    color:var(--ink);
+    font:15px/1.5 Georgia,"Palatino Linotype","Book Antiqua","Times New Roman",serif;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:26px 16px 44px;
+    -webkit-font-smoothing:antialiased;
+    text-shadow:0 1px 0 rgba(0,0,0,.7);
+  }
+  header,main{width:100%;max-width:1040px}
+  header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+  h1{
+    margin:0;font-size:15px;font-weight:400;font-variant:small-caps;
+    letter-spacing:.34em;color:var(--gold);
+  }
+  .pos{margin-left:auto;color:#b09a72;font-size:13px;font-variant-numeric:tabular-nums;letter-spacing:.05em}
+  .pos b{color:var(--bone);font-weight:400}
+
+  .toolbar{
+    display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:space-between;
+    padding:12px 14px;border:1px solid #5b4a30;border-radius:2px;
+    background:linear-gradient(#241c12,#171108 60%,#120d08);
+    box-shadow:
+      inset 0 1px 0 rgba(200,163,90,.20),
+      inset 0 0 0 1px rgba(0,0,0,.55),
+      inset 0 0 46px rgba(0,0,0,.65),
+      0 3px 14px rgba(0,0,0,.65);
+    margin-bottom:14px;
+  }
+  .seg{display:flex;gap:2px;padding:2px;border:1px solid #2c2116;border-radius:2px;background:#0c0906;
+       box-shadow:inset 0 1px 6px rgba(0,0,0,.8)}
+  .seg button{
+    all:unset;cursor:pointer;padding:6px 13px;border-radius:1px;
+    color:#9d8862;font-size:13px;font-variant:small-caps;letter-spacing:.14em;white-space:nowrap;
+  }
+  .seg button:hover{color:var(--bone);background:rgba(200,163,90,.07)}
+  .seg button[disabled]{opacity:.40;pointer-events:none}
+  .seg button[aria-pressed="true"]{
+    background:linear-gradient(#2f2617,#1e1810);color:#f0e2bf;
+    box-shadow:inset 0 0 0 1px rgba(200,163,90,.55), inset 0 1px 0 rgba(255,240,205,.16);
+  }
+
+  .tbgroup{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .tbright{margin-left:auto}
+  .roomwrap{display:flex;align-items:center;gap:12px}
+  .room{display:grid;grid-template-columns:repeat(3,27px);grid-template-rows:repeat(3,27px);gap:3px}
+  .side{
+    all:unset;cursor:pointer;display:grid;place-items:center;border-radius:1px;
+    font-size:12px;line-height:1;color:#7d6a49;background:#0d0a06;
+    box-shadow:inset 0 0 0 1px #2e2317;
+  }
+  .side:hover{color:var(--bone);box-shadow:inset 0 0 0 1px rgba(200,163,90,.55)}
+  .side[data-wall="1"]{
+    background:linear-gradient(#c6a86d,#8d7440);color:#1a1409;
+    box-shadow:inset 0 1px 0 rgba(255,240,205,.55), inset 0 -1px 0 rgba(0,0,0,.4), 0 1px 3px rgba(0,0,0,.7);
+    text-shadow:none;
+  }
+  .side[data-wall="1"]:hover{background:linear-gradient(#e0c286,#a98a4d)}
+  .side:focus-visible{outline:1px solid var(--gold);outline-offset:1px}
+  .room .n{grid-column:2;grid-row:1}
+  .room .w{grid-column:1;grid-row:2}
+  .room .e{grid-column:3;grid-row:2}
+  .room .s{grid-column:2;grid-row:3}
+  .room .here{
+    grid-column:2;grid-row:2;border-radius:1px;background:#0a0704;
+    box-shadow:inset 0 0 0 1px #2e2317;position:relative;
+  }
+  .room .here::after{
+    content:'';position:absolute;inset:8px;border-radius:50%;
+    background:radial-gradient(circle at 40% 35%, #f6e7bd, #b3893f 62%, #6d4d1c);
+    box-shadow:0 0 10px rgba(200,163,90,.55);
+  }
+  .room.is-disabled .side{pointer-events:none;opacity:.72}
+  .roomlabel{font-size:13px;color:var(--muted);line-height:1.35}
+  .roomlabel b{display:block;color:var(--bone);font-weight:400;font-variant:small-caps;letter-spacing:.07em}
+  .roomlabel span{display:block;color:#a8926a;font-size:12px}
+
+  .spacer{flex:1}
+  .btn{
+    all:unset;cursor:pointer;padding:7px 14px;border:1px solid #3a2b19;border-radius:2px;
+    color:#b39c72;font-size:12.5px;font-variant:small-caps;letter-spacing:.12em;
+    background:linear-gradient(#1d160e,#120d08);
+    box-shadow:inset 0 1px 0 rgba(200,163,90,.12);
+  }
+  .btn:hover{color:var(--bone);border-color:#6b5432;box-shadow:inset 0 1px 0 rgba(200,163,90,.25), 0 0 12px rgba(200,163,90,.10)}
+  .btn.danger:hover{color:#e6a898;border-color:#6d2a1d;box-shadow:0 0 12px rgba(143,42,30,.30)}
+  .btn[disabled]{opacity:.40;pointer-events:none}
+
+  #wrap{display:flex;justify-content:center}
+  canvas{
+    display:block;border-radius:2px;cursor:crosshair;touch-action:manipulation;
+    border:1px solid #5b4a30;
+    box-shadow:0 0 0 1px rgba(0,0,0,.85), 0 14px 34px rgba(0,0,0,.7);
+  }
+  .hint{
+    margin-top:13px;color:#a8926a;font-size:13px;
+    min-height:20px;text-align:center;letter-spacing:.01em;
+  }
+  .hint.warn{color:#e2b06a}
+</style>
+</head>
+<body>
+<header>
+  <h1>Labyrinth</h1>
+  <div class="pos" id="pos">&mdash;</div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <div class="tbgroup">
+      <div class="seg" id="modes">
+        <button data-mode="build" aria-pressed="true">Build</button>
+        <button data-mode="explore" aria-pressed="false">Explore</button>
+      </div>
+      <button class="btn" id="undo" disabled>Undo</button>
+      <div class="roomwrap">
+        <div class="room" id="room">
+          <button class="side n" data-dir="n" title="north wall">&#8593;</button>
+          <button class="side w" data-dir="w" title="west wall">&#8592;</button>
+          <span class="here"></span>
+          <button class="side e" data-dir="e" title="east wall">&#8594;</button>
+          <button class="side s" data-dir="s" title="south wall">&#8595;</button>
+        </div>
+        <div class="roomlabel"><b>this room</b><span id="roomnote">click a wall</span></div>
+      </div>
+    </div>
+
+    <div class="tbgroup tbright">
+      <div class="seg" id="names">
+        <button data-name="Nordom room" aria-pressed="false">Nordom room</button>
+        <button data-name="Wizard room" aria-pressed="false">Wizard room</button>
+      </div>
+      <button class="btn danger" id="clear">Clear board</button>
+      <button class="btn danger" id="seal">Seal everything</button>
+    </div>
+  </div>
+
+  <div id="wrap"><canvas id="board"></canvas></div>
+  <div class="hint" id="hint"></div>
+</main>
+
+<script>
+(function(){
+  'use strict';
+
+  var LS_KEY = 'labyrinth.v3';
+
+  var canvas   = document.getElementById('board');
+  var ctx      = canvas.getContext('2d');
+  var wrap     = document.getElementById('wrap');
+  var hintEl   = document.getElementById('hint');
+  var posEl    = document.getElementById('pos');
+  var roomEl   = document.getElementById('room');
+  var roomNote = document.getElementById('roomnote');
+
+  var HINTS = {
+    build:   'Walls appear as you enter a room and stay put. Walking through a side opens it; click a wall \u2014 or an arrow above \u2014 to open or close one yourself. WASD / arrows move.',
+    explore: 'Click a neighbouring room or use WASD / arrows. Only the ways you opened in Build let you pass.'
+  };
+
+  var DIRS = { n: [-1, 0], e: [0, 1], s: [1, 0], w: [0, -1] };
+  var DIRLIST = ['n', 'e', 's', 'w'];
+
+  // A room is a square with four sides. Every side is a wall unless a way
+  // through has been opened there — the open ways are the only thing stored.
+  var S = {
+    open: new Set(),       // 'v:r,c' = way through between (r,c) and (r,c+1)
+                           // 'h:r,c' = way through between (r,c) and (r+1,c)
+    mode: 'build',
+    cursor: {r: 0, c: 0},  // the room being edited
+    pos: {r: 0, c: 0},     // the room you are standing in
+    trail: new Set(),      // rooms uncovered while exploring
+    seen: new Set(),       // rooms whose walls have been revealed — they stay
+    names: {}              // 'r,c' -> room name
+  };
+
+  var LOBBY = {r: 0, c: 0, name: 'Lobby'};
+
+  function roomName(r, c){
+    if (r === LOBBY.r && c === LOBBY.c) return LOBBY.name;
+    return S.names[roomKey(r, c)] || null;
+  }
+
+  function isLobby(r, c){ return r === LOBBY.r && c === LOBBY.c; }
+
+  function roomKey(r, c){ return r + ',' + c; }
+
+  var cell = 64;
+  var grain = null;
+  var view = {offX: 0, offY: 0, W: 0, H: 0};
+  var hover = null;
+  var hoverRoom = null;
+  var hintTimer = 0;
+  var undoStack = [];
+
+  /* ---------------- palette ---------------- */
+
+  var C = {
+    wall:      '#c4a86c',
+    wallLit:   'rgba(255,238,200,0.55)',
+    wallDark:  'rgba(0,0,0,0.5)',
+    floor:     '#52432a',
+    floorLit:  '#655230',
+    solid:     '#241d13',
+    gold:      'rgba(200,163,90,',
+    bone:      '#f0e4c4',
+    blood:     '#8f2a1e'
+  };
+
+  /* ---------------- model ---------------- */
+
+  function vKey(r, c){ return 'v:' + r + ',' + c; }
+  function hKey(r, c){ return 'h:' + r + ',' + c; }
+
+  function sideKey(r, c, dir){
+    if (dir === 'n') return hKey(r - 1, c);
+    if (dir === 's') return hKey(r, c);
+    if (dir === 'w') return vKey(r, c - 1);
+    return vKey(r, c);
+  }
+
+  function edgeBetween(r1, c1, r2, c2){
+    if (r1 === r2) return vKey(r1, Math.min(c1, c2));
+    return hKey(Math.min(r1, r2), c1);
+  }
+
+  function isOpen(r, c, dir){ return S.open.has(sideKey(r, c, dir)); }
+
+  function openSides(r, c){
+    var n = 0;
+    for (var i = 0; i < 4; i++) if (isOpen(r, c, DIRLIST[i])) n++;
+    return n;
+  }
+
+  // moving into a neighbouring room opens the side you walked through
+  function carvePath(r1, c1, r2, c2){
+    var i;
+    if (r1 === r2 && c1 !== c2){
+      var dc = c2 > c1 ? 1 : -1;
+      for (i = c1; i !== c2; i += dc) S.open.add(vKey(r1, Math.min(i, i + dc)));
+    } else if (c1 === c2 && r1 !== r2){
+      var dr = r2 > r1 ? 1 : -1;
+      for (i = r1; i !== r2; i += dr) S.open.add(hKey(Math.min(i, i + dr), c1));
+    }
+  }
+
+  function toggleSide(r, c, dir){
+    var k = sideKey(r, c, dir);
+    if (S.open.has(k)) S.open.delete(k);
+    else S.open.add(k);
+  }
+
+  // a room is uncovered once you have stood in it
+  function markSeen(r, c){ S.seen.add(r + ',' + c); }
+
+  function isUncovered(r, c){
+    return S.mode === 'build' || S.trail.has(r + ',' + c);
+  }
+
+  /* ---------------- persistence ---------------- */
+
+  function save(){
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        open: Array.from(S.open),
+        cursor: [S.cursor.r, S.cursor.c],
+        pos: [S.pos.r, S.pos.c],
+        mode: S.mode,
+        trail: Array.from(S.trail),
+        seen: Array.from(S.seen),
+        names: S.names
+      }));
+    } catch (e){}
+  }
+
+  function load(){
+    var raw = null;
+    try { raw = localStorage.getItem(LS_KEY); } catch (e){ return; }
+    if (!raw) return;
+    var d;
+    try { d = JSON.parse(raw); } catch (e){ return; }
+    if (!d || typeof d !== 'object') return;
+
+    if (Array.isArray(d.open)){
+      S.open = new Set(d.open.filter(function(k){
+        return typeof k === 'string' && /^[hv]:-?\d+,-?\d+$/.test(k);
+      }));
+    }
+    if (Array.isArray(d.trail)){
+      S.trail = new Set(d.trail.filter(function(k){
+        return typeof k === 'string' && /^-?\d+,-?\d+$/.test(k);
+      }));
+    }
+    if (Array.isArray(d.seen)){
+      S.seen = new Set(d.seen.filter(function(k){
+        return typeof k === 'string' && /^-?\d+,-?\d+$/.test(k);
+      }));
+    }
+    if (d.names && typeof d.names === 'object'){
+      S.names = {};
+      Object.keys(d.names).forEach(function(k){
+        if (/^-?\d+,-?\d+$/.test(k) && typeof d.names[k] === 'string') S.names[k] = d.names[k];
+      });
+    }
+    function pt(a, fb){
+      if (Array.isArray(a) && a.length === 2 && isFinite(a[0]) && isFinite(a[1])) return {r: a[0] | 0, c: a[1] | 0};
+      return fb;
+    }
+    S.cursor = pt(d.cursor, {r: 0, c: 0});
+    S.pos = pt(d.pos, {r: S.cursor.r, c: S.cursor.c});
+    S.mode = (d.mode === 'explore') ? 'explore' : 'build';
+  }
+
+  /* ---------------- view ---------------- */
+
+  function layout(){
+    var maxW = Math.min(wrap.clientWidth || 800, 1040);
+    var top = wrap.getBoundingClientRect().top;
+    var maxH = Math.max(320, Math.min(window.innerHeight - top - 92, 760));
+    cell = Math.max(38, Math.min(92, Math.round(Math.min(maxW / 9, maxH / 6.5))));
+
+    var W = maxW, Hh = maxH;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.style.width = W + 'px';
+    canvas.style.height = Hh + 'px';
+    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(Hh * dpr)){
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(Hh * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    var cam = (S.mode === 'explore') ? S.pos : S.cursor;
+    view.W = W; view.H = Hh;
+    view.offX = W / 2 - (cam.c + 0.5) * cell;
+    view.offY = Hh / 2 - (cam.r + 0.5) * cell;
+    return {W: W, H: Hh};
+  }
+
+  function gridAt(x, y){
+    var gx = (x - view.offX) / cell, gy = (y - view.offY) / cell;
+    var c = Math.floor(gx), r = Math.floor(gy);
+    return {r: r, c: c, fx: gx - c, fy: gy - r};
+  }
+
+  function edgeAt(x, y){
+    var g = gridAt(x, y);
+    var cands = [
+      {type: 'v', r: g.r, c: g.c - 1, d: g.fx},
+      {type: 'v', r: g.r, c: g.c,     d: 1 - g.fx},
+      {type: 'h', r: g.r - 1, c: g.c, d: g.fy},
+      {type: 'h', r: g.r,     c: g.c, d: 1 - g.fy}
+    ];
+    var best = cands[0];
+    for (var i = 1; i < 4; i++) if (cands[i].d < best.d) best = cands[i];
+    var tol = Math.min(cell * 0.34, 15) / cell;
+    return best.d <= tol ? best : null;
+  }
+
+  function edgeOfRoom(ed, r, c){
+    if (ed.type === 'v') return ed.r === r && (ed.c === c || ed.c === c - 1);
+    return ed.c === c && (ed.r === r || ed.r === r - 1);
+  }
+
+  function pointFromEvent(e){
+    var r = canvas.getBoundingClientRect();
+    return {x: e.clientX - r.left, y: e.clientY - r.top};
+  }
+
+  /* ---------------- draw ---------------- */
+
+  function grainPattern(){
+    if (grain) return grain;
+    var nc = document.createElement('canvas');
+    nc.width = nc.height = 64;
+    var nx = nc.getContext('2d');
+    var img = nx.createImageData(64, 64);
+    for (var i = 0; i < img.data.length; i += 4){
+      var v = 128 + (Math.random() * 96 - 48);
+      img.data[i]     = v;
+      img.data[i + 1] = v * 0.93;
+      img.data[i + 2] = v * 0.80;
+      img.data[i + 3] = 20;
+    }
+    nx.putImageData(img, 0, 0);
+    grain = ctx.createPattern(nc, 'repeat');
+    return grain;
+  }
+
+  function paintGround(W, H){
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#150f08');
+    g.addColorStop(0.5, '#0d0906');
+    g.addColorStop(1, '#070505');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    var rad = ctx.createRadialGradient(W / 2, H * 0.42, Math.min(W, H) * 0.1, W / 2, H * 0.5, Math.max(W, H) * 0.75);
+    rad.addColorStop(0, 'rgba(150,110,50,0.12)');
+    rad.addColorStop(1, 'rgba(0,0,0,0.82)');
+    ctx.fillStyle = rad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // an uncovered room is drawn as a filled stone floor
+  function paintRoom(r, c, lit){
+    var x = view.offX + c * cell, y = view.offY + r * cell;
+    ctx.fillStyle = lit ? C.floorLit : C.floor;
+    ctx.fillRect(x, y, cell, cell);
+
+    // each slab is cut a little differently
+    var drift = (((r * 73856093) ^ (c * 19349663)) % 7) - 3;
+    ctx.fillStyle = drift > 0 ? 'rgba(255,232,190,' + (0.012 * drift) + ')'
+                              : 'rgba(0,0,0,' + (0.016 * -drift) + ')';
+    ctx.fillRect(x, y, cell, cell);
+
+    // top-lit stone: a faint highlight along the upper edge of the slab
+    var slab = ctx.createLinearGradient(0, y, 0, y + cell);
+    slab.addColorStop(0, 'rgba(214,182,132,0.07)');
+    slab.addColorStop(0.45, 'rgba(0,0,0,0)');
+    slab.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx.fillStyle = slab;
+    ctx.fillRect(x, y, cell, cell);
+
+    // contact shadow: light comes from the upper left, so the walls cast in
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, cell, cell);
+    ctx.clip();
+
+    var bandH = Math.max(4, cell * 0.11);
+    var gTop = ctx.createLinearGradient(0, y, 0, y + bandH);
+    gTop.addColorStop(0, 'rgba(0,0,0,0.34)');
+    gTop.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gTop;
+    ctx.fillRect(x, y, cell, bandH);
+
+    var gLeft = ctx.createLinearGradient(x, 0, x + bandH, 0);
+    gLeft.addColorStop(0, 'rgba(0,0,0,0.30)');
+    gLeft.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gLeft;
+    ctx.fillRect(x, y, bandH, cell);
+
+    var gBr = ctx.createLinearGradient(x + cell, y + cell, x + cell - bandH, y + cell - bandH);
+    gBr.addColorStop(0, 'rgba(255,238,200,0.07)');
+    gBr.addColorStop(1, 'rgba(255,238,200,0)');
+    ctx.fillStyle = gBr;
+    ctx.fillRect(x + cell - bandH, y + cell - bandH, bandH, bandH);
+    ctx.restore();
+
+    if (lit){
+      ctx.fillStyle = 'rgba(200,163,90,0.10)';
+      ctx.fillRect(x, y, cell, cell);
+      ctx.strokeStyle = 'rgba(200,163,90,0.55)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
+    }
+  }
+
+  // breadth-first walk through open ways, so the guide can never cross a wall
+  function findPath(from, to){
+    var start = roomKey(from.r, from.c), goal = roomKey(to.r, to.c);
+    if (start === goal) return [{r: from.r, c: from.c}];
+
+    var prev = {}, seen = new Set([start]), q = [start];
+    while (q.length && seen.size < 4000){
+      var cur = q.shift(), p = cur.split(','), r = +p[0], c = +p[1];
+      for (var i = 0; i < 4; i++){
+        var d = DIRLIST[i];
+        if (!isOpen(r, c, d)) continue;
+        var nr = r + DIRS[d][0], nc = c + DIRS[d][1], k = roomKey(nr, nc);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        prev[k] = cur;
+        if (k === goal){
+          var out = [{r: nr, c: nc}], kk = k;
+          while (prev[kk]){
+            var pp = prev[kk].split(',');
+            out.push({r: +pp[0], c: +pp[1]});
+            kk = prev[kk];
+          }
+          return out.reverse();
+        }
+        q.push(k);
+      }
+    }
+    return null;
+  }
+
+  // a guide drawn through the middle of the rooms it passes
+  function paintGuide(path, stroke, glow){
+    if (!path || path.length < 2) return;
+
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (var i = 0; i < path.length; i++){
+      var x = view.offX + path[i].c * cell + cell / 2;
+      var y = view.offY + path[i].r * cell + cell / 2;
+      if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    }
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = Math.max(6, cell * 0.11);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(3, cell * 0.10);
+    ctx.stroke();
+    ctx.restore();
+
+    var end = path[path.length - 1];
+    ctx.fillStyle = stroke;
+    ctx.beginPath();
+    ctx.arc(view.offX + end.c * cell + cell / 2, view.offY + end.r * cell + cell / 2, Math.max(3, cell * 0.075), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function paintName(r, c, text, yOff){
+    var x = view.offX + c * cell, y = view.offY + r * cell + (yOff || 0);
+    var fs = Math.max(9, Math.min(14, Math.round(cell * 0.155)));
+    ctx.save();
+    ctx.font = 'italic ' + fs + 'px Georgia, "Palatino Linotype", "Book Antiqua", serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    var maxW = cell - Math.max(8, cell * 0.14);
+    var words = String(text).split(/\s+/), lines = [], line = '';
+    for (var i = 0; i < words.length; i++){
+      var probe = line ? line + ' ' + words[i] : words[i];
+      if (line && ctx.measureText(probe).width > maxW){ lines.push(line); line = words[i]; }
+      else line = probe;
+    }
+    if (line) lines.push(line);
+    if (lines.length > 3) lines = lines.slice(0, 3);
+
+    var lh = fs * 1.2;
+    var top = y + cell / 2 - (lines.length - 1) * lh / 2;
+    for (i = 0; i < lines.length; i++){
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillText(lines[i], x + cell / 2 + 1, top + i * lh + 1);
+      ctx.fillStyle = 'rgba(246,234,205,0.92)';
+      ctx.fillText(lines[i], x + cell / 2, top + i * lh);
+    }
+    ctx.restore();
+  }
+
+  // one gilt band: warm metal face, lit edge, dark return
+  function band(x, y, w, h, horiz){
+    ctx.fillStyle = C.wall;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(255,244,210,0.75)';
+    if (horiz){ ctx.fillRect(x, y, w, 2); }
+    else { ctx.fillRect(x, y, 2, h); }
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    if (horiz){ ctx.fillRect(x, y + h - 2, w, 2); }
+    else { ctx.fillRect(x + w - 2, y, 2, h); }
+  }
+
+  function paintWalls(r, c){
+    var x = view.offX + c * cell, y = view.offY + r * cell;
+    var t = Math.max(5, Math.min(9, Math.round(cell * 0.12)));
+    var half = t / 2;
+
+    if (!isOpen(r, c, 'n')) band(x - half, y - half, cell + t, t, true);
+    if (!isOpen(r, c, 's')) band(x - half, y + cell - half, cell + t, t, true);
+    if (!isOpen(r, c, 'w')) band(x - half, y - half, t, cell + t, false);
+    if (!isOpen(r, c, 'e')) band(x + cell - half, y - half, t, cell + t, false);
+  }
+
+  function render(){
+    var d = layout();
+    paintGround(d.W, d.H);
+
+    var offX = view.offX, offY = view.offY;
+    var c0 = Math.floor(-offX / cell) - 1, c1 = Math.floor((d.W - offX) / cell) + 1;
+    var r0 = Math.floor(-offY / cell) - 1, r1 = Math.floor((d.H - offY) / cell) + 1;
+
+    var here = (S.mode === 'explore') ? S.pos : S.cursor;
+
+    // every room is drawn as a filled stone slab, in both modes
+    for (var rr = r0; rr <= r1 + 1; rr++){
+      for (var cc = c0; cc <= c1 + 1; cc++){
+        paintRoom(rr, cc, rr === here.r && cc === here.c);
+      }
+    }
+    ctx.fillStyle = grainPattern();
+    ctx.fillRect(0, 0, d.W, d.H);
+
+    // rooms you have walked through carry a faint warm wash
+    if (S.mode === 'explore'){
+      ctx.fillStyle = 'rgba(219,182,120,0.26)';
+      S.trail.forEach(function(k){
+        var p = k.split(','), rr2 = +p[0], cc2 = +p[1];
+        if (rr2 === here.r && cc2 === here.c) return;
+        var px = offX + cc2 * cell, py = offY + rr2 * cell;
+        if (px < -cell || py < -cell || px > d.W || py > d.H) return;
+        ctx.fillRect(px + 3, py + 3, cell - 6, cell - 6);
+      });
+    }
+
+    // walls are revealed room by room and stay revealed
+    S.seen.forEach(function(k){
+      var p = k.split(','), rr3 = +p[0], cc3 = +p[1];
+      var px = offX + cc3 * cell, py = offY + rr3 * cell;
+      if (px < -cell || py < -cell || px > d.W || py > d.H) return;
+      paintWalls(rr3, cc3);
+    });
+
+    // while exploring, show the way back to the lobby and on to the wizard room
+    if (S.mode === 'explore'){
+      var wizKey = null;
+      Object.keys(S.names).forEach(function(k){ if (S.names[k] === 'Wizard room') wizKey = k; });
+      if (wizKey){
+        var wp = wizKey.split(',');
+        paintGuide(findPath(S.pos, {r: +wp[0], c: +wp[1]}), 'rgba(188,66,50,0.62)', 'rgba(206,74,56,0.45)');
+      }
+      paintGuide(findPath(S.pos, LOBBY), 'rgba(106,160,226,0.60)', 'rgba(106,160,226,0.40)');
+    }
+
+    // named rooms are landmarks — their names stay visible
+    var marked = Object.keys(S.names).map(function(k){
+      var p = k.split(',');
+      return {r: +p[0], c: +p[1], name: S.names[k]};
+    });
+    marked.push({r: LOBBY.r, c: LOBBY.c, name: LOBBY.name});
+    marked.forEach(function(m){
+      var nx = offX + m.c * cell, ny = offY + m.r * cell;
+      if (nx < -cell || ny < -cell || nx > d.W || ny > d.H) return;
+      var lift = (S.mode === 'explore' && m.r === S.pos.r && m.c === S.pos.c) ? -cell * 0.25 : 0;
+      paintName(m.r, m.c, m.name, lift);
+    });
+
+    // a quiet cue that the next room is a click away
+    if (S.mode === 'build' && hoverRoom && (hoverRoom.r !== here.r || hoverRoom.c !== here.c)){
+      ctx.save();
+      ctx.setLineDash([4, 5]);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(200,163,90,0.30)';
+      ctx.strokeRect(offX + hoverRoom.c * cell + 3, offY + hoverRoom.r * cell + 3, cell - 6, cell - 6);
+      ctx.restore();
+    }
+
+    if (S.mode === 'build' && hover){
+      ctx.strokeStyle = 'rgba(240,228,196,0.95)';
+      ctx.lineWidth = Math.max(4, cell * 0.14);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      if (hover.type === 'v'){
+        var hx1 = offX + (hover.c + 1) * cell, hy1 = offY + hover.r * cell;
+        ctx.moveTo(hx1, hy1 + 3); ctx.lineTo(hx1, hy1 + cell - 3);
+      } else {
+        var hy2 = offY + (hover.r + 1) * cell, hx2 = offX + hover.c * cell;
+        ctx.moveTo(hx2 + 3, hy2); ctx.lineTo(hx2 + cell - 3, hy2);
+      }
+      ctx.stroke();
+    }
+
+    if (S.mode === 'build'){
+      ctx.save();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(240,206,140,0.95)';
+      ctx.shadowColor = 'rgba(200,163,90,0.5)';
+      ctx.shadowBlur = 8;
+      var cx0 = offX + S.cursor.c * cell, cy0 = offY + S.cursor.r * cell;
+      ctx.strokeRect(cx0 + 4, cy0 + 4, cell - 8, cell - 8);
+      ctx.restore();
+    } else {
+      var mx = offX + S.pos.c * cell + cell / 2, my = offY + S.pos.r * cell + cell / 2;
+      var rad = Math.max(4, cell * 0.22);
+      ctx.save();
+      ctx.shadowColor = 'rgba(200,163,90,0.85)';
+      ctx.shadowBlur = Math.max(10, cell * 0.6);
+      var orb = ctx.createRadialGradient(mx - rad * 0.35, my - rad * 0.4, rad * 0.15, mx, my, rad);
+      orb.addColorStop(0, '#fbf0d2');
+      orb.addColorStop(0.55, '#c8a35a');
+      orb.addColorStop(1, '#6b4a1b');
+      ctx.fillStyle = orb;
+      ctx.beginPath(); ctx.arc(mx, my, rad, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = 'rgba(20,12,6,0.85)';
+      ctx.beginPath(); ctx.arc(mx, my, Math.max(1.4, rad * 0.32), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  /* ---------------- chrome ---------------- */
+
+  function updateChrome(){
+    var room = (S.mode === 'build') ? S.cursor : S.pos;
+    var nOpen = openSides(room.r, room.c);
+    var label = roomName(room.r, room.c);
+    posEl.innerHTML = (label ? '<b>' + label + '</b> &middot; ' : '') +
+      'room <b>' + room.r + ',' + room.c + '</b> &middot; <b>' + nOpen + '</b> open side' + (nOpen === 1 ? '' : 's');
+
+    Array.prototype.forEach.call(document.querySelectorAll('.side'), function(b){
+      var hasWay = isOpen(room.r, room.c, b.dataset.dir);
+      b.dataset.wall = hasWay ? '0' : '1';       // gilt plate = wall
+      b.setAttribute('aria-pressed', String(!hasWay));
+      b.disabled = (S.mode !== 'build');
+      b.title = (hasWay ? 'way through' : 'wall') + ' \u2014 ' + b.dataset.dir.toUpperCase() + ' side';
+    });
+    roomEl.classList.toggle('is-disabled', S.mode !== 'build');
+    Array.prototype.forEach.call(document.querySelectorAll('#names button'), function(b){
+      b.setAttribute('aria-pressed', String(S.names[roomKey(room.r, room.c)] === b.dataset.name));
+      b.disabled = (S.mode !== 'build' || isLobby(room.r, room.c));
+      b.title = isLobby(room.r, room.c)
+        ? 'the lobby keeps its name'
+        : (S.names[roomKey(room.r, room.c)] === b.dataset.name
+            ? 'remove this label'
+            : 'label this room as ' + b.dataset.name);
+    });
+    document.getElementById('undo').disabled = undoStack.length === 0;
+    document.getElementById('seal').disabled = (S.mode !== 'build');
+    document.getElementById('clear').disabled = (S.mode !== 'build');
+    roomNote.textContent = (S.mode === 'build') ? 'click a wall' : 'locked';
+
+    Array.prototype.forEach.call(document.querySelectorAll('#modes button'), function(b){
+      b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode));
+    });
+    canvas.style.cursor = (S.mode === 'build') ? 'crosshair' : 'pointer';
+
+    if (!hintEl.classList.contains('warn')) hintEl.textContent = HINTS[S.mode];
+  }
+
+  function flash(msg){
+    clearTimeout(hintTimer);
+    if (!msg){
+      hintEl.textContent = HINTS[S.mode];
+      hintEl.classList.remove('warn');
+      return;
+    }
+    hintEl.textContent = msg;
+    hintEl.classList.add('warn');
+    hintTimer = setTimeout(function(){
+      hintEl.textContent = HINTS[S.mode];
+      hintEl.classList.remove('warn');
+    }, 1900);
+  }
+
+  /* ---------------- undo ---------------- */
+
+  function snapshot(){
+    return {
+      open: Array.from(S.open),
+      seen: Array.from(S.seen),
+      trail: Array.from(S.trail),
+      names: Object.assign({}, S.names),
+      cursor: {r: S.cursor.r, c: S.cursor.c},
+      pos: {r: S.pos.r, c: S.pos.c},
+      mode: S.mode
+    };
+  }
+
+  function remember(){
+    undoStack.push(snapshot());
+    if (undoStack.length > 150) undoStack.shift();
+  }
+
+  function undo(){
+    var prev = undoStack.pop();
+    if (!prev){
+      flash('nothing to undo');
+      return;
+    }
+    S.open = new Set(prev.open);
+    S.seen = new Set(prev.seen);
+    S.trail = new Set(prev.trail);
+    S.names = Object.assign({}, prev.names);
+    S.cursor = {r: prev.cursor.r, c: prev.cursor.c};
+    S.pos = {r: prev.pos.r, c: prev.pos.c};
+    S.mode = prev.mode;
+    hover = null;
+    hoverRoom = null;
+    commit();
+    flash('undone');
+  }
+
+  function commit(){
+    save();
+    render();
+    updateChrome();
+  }
+
+  /* ---------------- actions ---------------- */
+
+  function tryMove(r, c){
+    if (r === S.pos.r && c === S.pos.c) return;
+    var dr = r - S.pos.r, dc = c - S.pos.c;
+    if (Math.abs(dr) + Math.abs(dc) !== 1){ flash('one room at a time'); return; }
+    if (!S.open.has(edgeBetween(S.pos.r, S.pos.c, r, c))){ flash('that side is a wall'); return; }
+    remember();
+    S.pos = {r: r, c: c};
+    S.trail.add(r + ',' + c);
+    markSeen(r, c);
+    flash(null);
+    commit();
+  }
+
+  function setMode(m){
+    if (m === S.mode) return;
+    remember();
+    if (m === 'explore'){
+      S.pos = {r: S.cursor.r, c: S.cursor.c};
+      S.trail = new Set([S.pos.r + ',' + S.pos.c]);
+    } else {
+      S.cursor = {r: S.pos.r, c: S.pos.c};
+    }
+    S.mode = m;
+    hover = null;
+    markSeen(S.cursor.r, S.cursor.c);
+    markSeen(S.pos.r, S.pos.c);
+    flash(null);
+    commit();
+    if (m === 'explore' && openSides(S.pos.r, S.pos.c) === 0){
+      flash('this room is sealed \u2014 open a wall in Build');
+    }
+  }
+
+  /* ---------------- events ---------------- */
+
+  canvas.addEventListener('pointermove', function(e){
+    if (S.mode !== 'build'){
+      if (hover){ hover = null; render(); }
+      return;
+    }
+    var p = pointFromEvent(e);
+    var next = edgeAt(p.x, p.y);
+    if (next && !edgeOfRoom(next, S.cursor.r, S.cursor.c)) next = null;
+
+    var g = gridAt(p.x, p.y);
+    var room = next ? null : g;
+
+    var changed = JSON.stringify(next) !== JSON.stringify(hover) ||
+                  JSON.stringify(room) !== JSON.stringify(hoverRoom);
+    hover = next;
+    hoverRoom = room;
+    if (changed) render();
+  });
+
+  canvas.addEventListener('pointerleave', function(){
+    if (hover || hoverRoom){ hover = null; hoverRoom = null; render(); }
+  });
+
+  canvas.addEventListener('pointerdown', function(e){
+    if (e.button !== 0) return;
+    var p = pointFromEvent(e);
+
+    if (S.mode === 'build'){
+      var ed = edgeAt(p.x, p.y);
+      if (ed && edgeOfRoom(ed, S.cursor.r, S.cursor.c)){
+        remember();
+        var k = (ed.type === 'v') ? vKey(ed.r, ed.c) : hKey(ed.r, ed.c);
+        if (S.open.has(k)) S.open.delete(k);
+        else S.open.add(k);
+        flash(null);
+        commit();
+        return;
+      }
+      var g = gridAt(p.x, p.y);
+      if (g.r !== S.cursor.r || g.c !== S.cursor.c){
+        remember();
+        if (Math.abs(g.r - S.cursor.r) + Math.abs(g.c - S.cursor.c) === 1){
+          carvePath(S.cursor.r, S.cursor.c, g.r, g.c);
+        }
+        S.cursor = {r: g.r, c: g.c};
+        markSeen(g.r, g.c);
+        commit();
+      }
+      return;
+    }
+
+    var g2 = gridAt(p.x, p.y);
+    tryMove(g2.r, g2.c);
+  });
+
+  window.addEventListener('keydown', function(e){
+    var k = e.key, mv = null;
+
+    if ((e.ctrlKey || e.metaKey) && (k === 'z' || k === 'Z')){
+      if (e.target && e.target.tagName === 'INPUT') return;
+      e.preventDefault();
+      undo();
+      return;
+    }
+    if (k === 'ArrowUp' || k === 'w' || k === 'W') mv = [-1, 0];
+    else if (k === 'ArrowDown' || k === 's' || k === 'S') mv = [1, 0];
+    else if (k === 'ArrowLeft' || k === 'a' || k === 'A') mv = [0, -1];
+    else if (k === 'ArrowRight' || k === 'd' || k === 'D') mv = [0, 1];
+    if (!mv) return;
+    if (e.target && e.target.tagName === 'INPUT') return;
+    e.preventDefault();
+
+    if (S.mode === 'build'){
+      var step = e.shiftKey ? 5 : 1;
+      var nr = S.cursor.r + mv[0] * step, nc = S.cursor.c + mv[1] * step;
+      remember();
+      carvePath(S.cursor.r, S.cursor.c, nr, nc);
+      S.cursor = {r: nr, c: nc};
+      markSeen(nr, nc);
+      flash(null);
+      commit();
+    } else {
+      tryMove(S.pos.r + mv[0], S.pos.c + mv[1]);
+    }
+  });
+
+  document.getElementById('modes').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-mode]');
+    if (b) setMode(b.dataset.mode);
+  });
+
+  roomEl.addEventListener('click', function(e){
+    var b = e.target.closest('button[data-dir]');
+    if (!b || S.mode !== 'build') return;
+    toggleSide(S.cursor.r, S.cursor.c, b.dataset.dir);
+    flash(null);
+    commit();
+  });
+
+  document.getElementById('seal').addEventListener('click', function(){
+    if (!S.open.size){ flash('every way is already sealed'); return; }
+    remember();
+    S.open.clear();
+    commit();
+    flash('every way is sealed');
+  });
+
+  document.getElementById('undo').addEventListener('click', undo);
+
+  document.getElementById('names').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-name]');
+    if (!b || S.mode !== 'build') return;
+    if (isLobby(S.cursor.r, S.cursor.c)) return;
+    remember();
+    var k = roomKey(S.cursor.r, S.cursor.c);
+    if (S.names[k] === b.dataset.name){
+      delete S.names[k];
+      flash(b.dataset.name + ' removed');
+    } else {
+      // the label exists only once — take it away from wherever it was
+      Object.keys(S.names).forEach(function(key){
+        if (S.names[key] === b.dataset.name) delete S.names[key];
+      });
+      S.names[k] = b.dataset.name;
+      flash(b.dataset.name + ' placed');
+    }
+    commit();
+  });
+
+  document.getElementById('clear').addEventListener('click', function(){
+    remember();
+    S.open.clear();
+    S.seen.clear();
+    S.trail.clear();
+    S.cursor = {r: 0, c: 0};
+    S.pos = {r: 0, c: 0};
+    S.mode = 'build';
+    S.names = {};
+    hover = null;
+    hoverRoom = null;
+    markSeen(0, 0);
+    commit();
+    flash('board cleared');
+  });
+
+  window.addEventListener('resize', render);
+
+  /* ---------------- boot ---------------- */
+
+  load();
+  markSeen(S.cursor.r, S.cursor.c);
+  markSeen(S.pos.r, S.pos.c);
+  commit();
+
+  window.lab = S; // handy for debugging / automation
+})();
+</script>
+</body>
+</html>
